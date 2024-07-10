@@ -3,41 +3,33 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import z from 'zod';
 import { prisma } from '../lib/prisma';
 import { NotFoundError } from '../errors/not-found-error';
-import { env } from '../env';
 
-export async function confirmParticipant(app: FastifyInstance) {
-  app.withTypeProvider<ZodTypeProvider>().get('/participants/:participantId/confirm', {
+export async function getParticipant(app: FastifyInstance) {
+  app.withTypeProvider<ZodTypeProvider>().get('/participants/:participantId', {
     schema: {
       params: z.object({
         participantId: z.string().uuid(),
       }),
     },
-  }, async (request, reply) => {
+  }, async (request) => {
     const { participantId } = request.params;
 
     const participant = await prisma.participant.findUnique({
       where: {
         id: participantId,
       },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        is_confirmed: true,
+      }
     });
 
     if (!participant) {
       throw new NotFoundError('Participant not found');
     }
 
-    if (participant.is_confirmed) {
-      return reply.redirect(`${env.WEB_BASE_URL}/trips/${participant.trip_id}`);
-    }
-
-    await prisma.participant.update({
-      where: {
-        id: participantId,
-      },
-      data: {
-        is_confirmed: true,
-      },
-    });
-
-    return reply.redirect(`${env.WEB_BASE_URL}/trips/${participant.trip_id}`);
+    return { participant };
   });
 }
